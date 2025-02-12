@@ -9,4 +9,7 @@ source activate basic_gpt
 # Install the packages listed in requirements.txt using pip
 pip install -r requirements.txt
 
-echo "Conda environment 'basic_gpt' created and requirements installed."
+# Test if PyTorch MPS device is available
+python -c "import torch; print('MPS device available:', torch.backends.mps.is_available())"
+
+echo "Conda environment 'basic_gpt' created, requirements installed, and MPS device availability tested."

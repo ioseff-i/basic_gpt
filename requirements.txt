@@ -1,4 +1,37 @@
-torch==2.0.1
-transformers==4.30.0
-numpy==1.23.5
-pandas==1.5.3
+# Core PyTorch
+torch
+torchvision
+torchaudio
+
+# NLP / Transformers
+transformers
+tiktoken
+sentence-transformers
+
+# Data Science Stack
+numpy
+pandas
+scipy
+scikit-learn
+
+# Visualization
+matplotlib
+seaborn
+
+# Utilities
+tqdm
+requests
+h5py
+joblib
+PyYAML
+regex
+
+# Language / NLP
+spacy
+nltk
+
+# Experiment Tracking and APIs
+wandb
+openai
+matplotlib
+seaborn
