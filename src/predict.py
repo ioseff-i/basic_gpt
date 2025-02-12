@@ -6,6 +6,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join('..')))
 import argparse
 from model import GPTModel
 
