@@ -5,6 +5,8 @@ import tiktoken
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+import argparse
 from model import GPTModel
 
 GPT_CONFIG_124M = {
@@ -46,9 +48,14 @@ def generate_text_simple(model, idx, max_new_tokens, context_size):
     return idx
 
 if __name__=='__main__':
+    parser = argparse.ArgumentParser(description='Generate text using GPT model')
+    parser.add_argument('--seed', type=str, help='Seed sentence for text generation')
+    args = parser.parse_args()
+    
+    start_context = args.seed
+    
     tokenizer = tiktoken.get_encoding("gpt2")
 
-    start_context = input("Input seed sentence: ")
     encoded = tokenizer.encode(start_context)
 
     encoded_tensor = torch.tensor(encoded).unsqueeze(0)
