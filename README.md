@@ -1,6 +1,6 @@
 # DummyGPT
 
-A simple text generation model using PyTorch.
+A simple text generation model using PyTorch by following the Build A Large Language Model (From Scratch) book of Sebastian Raschka. 
 
 ## Installation
 
