@@ -1,0 +1,21 @@
+# Ignore the notebooks folder
+notebooks/
+
+# Ignore all .pt files anywhere in the repository
+*.pt
+
+# Ignore other unnecessary files
+data/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+*.log
+*.env
+*.venv
+venv/
+.vscode/
+.idea/
+.DS_Store
