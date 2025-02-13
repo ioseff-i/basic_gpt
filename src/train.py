@@ -5,7 +5,7 @@ import tiktoken
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from tqdm import trange
 import sys
 import os
 sys.path.append(os.path.abspath(os.path.join('..')))
@@ -58,7 +58,7 @@ def train_model(model,
                 start_context,tokenizer):
     train_losses , val_losses = [],[]
     global_step = 0
-    for epoch in range(num_epochs):
+    for epoch in trange(num_epochs):
         model.train()
         for input_batch, target_batch in train_loader:
             optimizer.zero_grad()
@@ -67,6 +67,11 @@ def train_model(model,
                                    model,
                                    device)
             loss.backward()
+            
+            # Gradient clipping
+            max_norm = 2.0  # Set the maximum norm for gradients
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
+            
             optimizer.step()
             global_step += 1
             if global_step % eval_freq == 0:
@@ -79,7 +84,7 @@ def train_model(model,
         generate_and_print_sample(
             model, tokenizer, device, start_context
         )
-        return train_losses, val_losses
+    return train_losses, val_losses
 
 def evaluate_model(model, train_loader, val_loader, eval_iter):
     model.eval()
@@ -107,7 +112,7 @@ def generate_and_print_sample(model, tokenizer, device, start_context):
     print(decoded_text.replace("\n", " "))
     model.train()
     
-    
+
 
 if __name__=='__main__':
     if torch.cuda.is_available():
@@ -160,7 +165,7 @@ if __name__=='__main__':
     tokenizer = tiktoken.get_encoding("gpt2")
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-2)
     
-    num_epochs = 2
+    num_epochs = 10
     train_losses, val_losses = train_model(
         model, train_loader, val_loader,
         optimizer, device, num_epochs = num_epochs,
@@ -168,6 +173,20 @@ if __name__=='__main__':
         start_context= " Every effort moves you", tokenizer=tokenizer,
     )
     
+    epochs_tensor = torch.linspace(0, num_epochs, len(train_losses))
+    plot_losses(epochs_tensor, train_losses, val_losses)
+    token_ids = generate(
+        model=model,
+        idx=text_to_token_ids("Every effort moves you", tokenizer).to(device),
+        max_new_tokens=15,
+        context_size=GPT_CONFIG_124M["context_length"],
+        top_k=25,
+        temperature=1.4)
+
+    print("Output text:\n", token_ids_to_text(token_ids, tokenizer))
+    
+    
+
 
 
 
