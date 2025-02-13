@@ -51,67 +51,106 @@ def calc_loss_loader(data_loader, model, device, num_batches = None):
     return total_loss / num_batches
 
 
-def train_model(model,
-                train_loader,val_loader,
-                optimizer,device,
-                num_epochs,eval_freq,eval_iter,
-                start_context,tokenizer):
-    train_losses , val_losses = [],[]
+
+import torch
+from torch.optim.lr_scheduler import CosineAnnealingLR
+from tqdm import trange
+
+def train_model(
+    model,
+    train_loader,
+    val_loader,
+    optimizer,
+    device,
+    num_epochs,
+    eval_freq,
+    eval_iter,
+    start_context,
+    tokenizer,
+    early_stopping_patience=3,  # Number of epochs to wait for improvement
+    min_lr=2e-5,  # Minimum learning rate for cosine scheduler
+):
+    # Initialize lists to track losses
+    train_losses, val_losses = [], []
     global_step = 0
+
+    # Initialize cosine learning rate scheduler
+    scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs, eta_min=min_lr)
+
+    # Early stopping variables
+    best_val_loss = float("inf")
+    epochs_without_improvement = 0
+
+    # Training loop
     for epoch in trange(num_epochs):
         model.train()
         for input_batch, target_batch in train_loader:
             optimizer.zero_grad()
-            loss = calc_loss_batch(input_batch,
-                                   target_batch,
-                                   model,
-                                   device)
+            loss = calc_loss_batch(input_batch, target_batch, model, device)
             loss.backward()
-            
+
             # Gradient clipping
-            max_norm = 2.0  # Set the maximum norm for gradients
+            max_norm = 1.0  # Set the maximum norm for gradients
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
-            
+
             optimizer.step()
             global_step += 1
+
+            # Evaluation and logging
             if global_step % eval_freq == 0:
                 train_loss, val_loss = evaluate_model(
-                    model, train_loader, val_loader, eval_iter
+                    model, train_loader, val_loader, eval_iter, device
                 )
                 train_losses.append(train_loss)
                 val_losses.append(val_loss)
-                print(f"Epoch {epoch}, Global Step {global_step}: Train Loss: {train_loss:.4f}, Validation Loss: {val_loss:.4f}")
-        generate_and_print_sample(
-            model, tokenizer, device, start_context
-        )
+                # print(
+                #     f"Epoch {epoch}, Global Step {global_step}: "
+                #     f"Train Loss: {train_loss:.4f}, Validation Loss: {val_loss:.4f}"
+                # )
+
+                # Early stopping logic
+                if val_loss < best_val_loss:
+                    best_val_loss = val_loss
+                    epochs_without_improvement = 0
+                else:
+                    epochs_without_improvement += 1
+
+                if epochs_without_improvement >= early_stopping_patience:
+                    print(
+                        f"Early stopping at epoch {epoch} (no improvement for {early_stopping_patience} epochs)."
+                    )
+                    return train_losses, val_losses
+
+        # Update learning rate using cosine scheduler
+        scheduler.step()
+
+        # Generate and print sample text
+        # generate_and_print_sample(model, tokenizer, device, start_context)
+
     return train_losses, val_losses
 
-def evaluate_model(model, train_loader, val_loader, eval_iter):
+
+def evaluate_model(model, train_loader, val_loader, eval_iter, device):
     model.eval()
     with torch.no_grad():
-        train_loss = calc_loss_loader(
-            train_loader, model, device, eval_iter
-        )
-        val_loss = calc_loss_loader(
-            val_loader, model, device, eval_iter
-        )
+        train_loss = calc_loss_loader(train_loader, model, device, eval_iter)
+        val_loss = calc_loss_loader(val_loader, model, device, eval_iter)
     model.train()
     return train_loss, val_loss
+
+
 def generate_and_print_sample(model, tokenizer, device, start_context):
     model.eval()
     context_size = model.pos_emb.weight.shape[1]
-    encoded  = text_to_token_ids(start_context, tokenizer).to(device)
+    encoded = text_to_token_ids(start_context, tokenizer).to(device)
     with torch.no_grad():
         token_ids = generate_text_simple(
-            model = model,
-            idx = encoded,
-            max_new_tokens = 64,
-            context_size = context_size
+            model=model, idx=encoded, max_new_tokens=64, context_size=context_size
         )
     decoded_text = token_ids_to_text(token_ids, tokenizer)
     print(decoded_text.replace("\n", " "))
     model.train()
-    
+
 
 
 if __name__=='__main__':
@@ -131,7 +170,6 @@ if __name__=='__main__':
     # file_path = "../data/fuzuli.txt"
     with open(file_path, "r", encoding="utf-8") as file:
         text_data = file.read()
-        
         
 
     # Train/validation ratio
@@ -163,14 +201,23 @@ if __name__=='__main__':
         num_workers=0
     )
     tokenizer = tiktoken.get_encoding("gpt2")
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-2)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=2e-3, weight_decay=1e-2)
     
-    num_epochs = 10
+    num_epochs = 100
+    # Train the model
     train_losses, val_losses = train_model(
-        model, train_loader, val_loader,
-        optimizer, device, num_epochs = num_epochs,
-        eval_freq = 5, eval_iter = 5,
-        start_context= " Every effort moves you", tokenizer=tokenizer,
+        model=model,
+        train_loader=train_loader,
+        val_loader=val_loader,
+        optimizer=optimizer,
+        device=device,
+        num_epochs=num_epochs,
+        eval_freq=5,
+        eval_iter=5,
+        start_context="Every effort moves you",
+        tokenizer=tokenizer,
+        early_stopping_patience=10,
+        min_lr=1e-6,
     )
     
     epochs_tensor = torch.linspace(0, num_epochs, len(train_losses))
