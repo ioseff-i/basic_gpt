@@ -11,7 +11,7 @@ import os
 sys.path.append(os.path.abspath(os.path.join('..')))
 import argparse
 from model import GPTModel
-from utils import create_dataloader_v1
+from utils import *
 
 
 GPT_CONFIG_124M = {
@@ -52,6 +52,11 @@ def calc_loss_loader(data_loader, model, device, num_batches = None):
 
 
 
+
+
+
+
+
 if __name__=='__main__':
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -59,11 +64,13 @@ if __name__=='__main__':
         device = torch.device("mps")
     else:
         device = torch.device("cpu")
-        
+    print(f"Using device: {device}")
+    
     model = GPTModel(GPT_CONFIG_124M).to(device)
 
 
-    file_path = "../data/the-verdict.txt"
+    file_path = "data/the-verdict.txt"
+    
     # file_path = "../data/fuzuli.txt"
     with open(file_path, "r", encoding="utf-8") as file:
         text_data = file.read()
@@ -75,8 +82,8 @@ if __name__=='__main__':
     split_idx = int(train_ratio * len(text_data))
     train_data = text_data[:split_idx]
     val_data = text_data[split_idx:]
-
-
+    
+    
     torch.manual_seed(123)
 
     train_loader = create_dataloader_v1(
@@ -98,16 +105,16 @@ if __name__=='__main__':
         shuffle=False,
         num_workers=0
     )
+    tokenizer = tiktoken.get_encoding("gpt2")
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-2)
     
-    with torch.no_grad():
-        train_loss = calc_loss_loader(
-            train_loader, model, device
-        )
-        val_loss = calc_loss_loader(
-            
-        )
-    print(f"Train loss: {train_loss:.4f}")
-    print(f"Validation loss: {val_loss:.4f}")
+    num_epochs = 2
+    train_losses, val_losses = train_model(
+        model, train_loader, val_loader,
+        optimizer, device, num_epochs = num_epochs,
+        eval_freq = 5, eval_iter = 5,
+        start_context= " Every effort moves you", tokenizer=tokenizer,
+    )
     
 
 
