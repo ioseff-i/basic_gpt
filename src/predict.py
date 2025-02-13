@@ -77,3 +77,5 @@ if __name__=='__main__':
     
     decoded_text = tokenizer.decode(out.squeeze(0).tolist())
     print(decoded_text)
+    
+    
