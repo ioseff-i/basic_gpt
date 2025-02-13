@@ -201,7 +201,7 @@ if __name__=='__main__':
         num_workers=0
     )
     tokenizer = tiktoken.get_encoding("gpt2")
-    optimizer = torch.optim.AdamW(model.parameters(), lr=2e-3, weight_decay=1e-2)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=5e-5, weight_decay=1e-2)
     
     num_epochs = 100
     # Train the model
@@ -216,8 +216,8 @@ if __name__=='__main__':
         eval_iter=5,
         start_context="Every effort moves you",
         tokenizer=tokenizer,
-        early_stopping_patience=10,
-        min_lr=1e-6,
+        early_stopping_patience=5,
+        min_lr=6e-6,
     )
     
     epochs_tensor = torch.linspace(0, num_epochs, len(train_losses))
