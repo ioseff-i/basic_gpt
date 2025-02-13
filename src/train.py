@@ -11,7 +11,7 @@ import os
 sys.path.append(os.path.abspath(os.path.join('..')))
 import argparse
 from model import GPTModel
-from utils import create_dataloader_v1
+from utils import *
 
 
 GPT_CONFIG_124M = {
@@ -49,13 +49,65 @@ def calc_loss_loader(data_loader, model, device, num_batches = None):
         else:
             break
     return total_loss / num_batches
+
+
+def train_model(model,
+                train_loader,val_loader,
+                optimizer,device,
+                num_epochs,eval_freq,eval_iter,
+                start_context,tokenizer):
+    train_losses , val_losses = [],[]
+    global_step = 0
+    for epoch in range(num_epochs):
+        model.train()
+        for input_batch, target_batch in train_loader:
+            optimizer.zero_grad()
+            loss = calc_loss_batch(input_batch,
+                                   target_batch,
+                                   model,
+                                   device)
+            loss.backward()
+            optimizer.step()
+            global_step += 1
+            if global_step % eval_freq == 0:
+                train_loss, val_loss = evaluate_model(
+                    model, train_loader, val_loader, eval_iter
+                )
+                train_losses.append(train_loss)
+                val_losses.append(val_loss)
+                print(f"Epoch {epoch}, Global Step {global_step}: Train Loss: {train_loss:.4f}, Validation Loss: {val_loss:.4f}")
+        generate_and_print_sample(
+            model, tokenizer, device, start_context
+        )
+        return train_losses, val_losses
+
+def evaluate_model(model, train_loader, val_loader, eval_iter):
+    model.eval()
+    with torch.no_grad():
+        train_loss = calc_loss_loader(
+            train_loader, model, device, eval_iter
+        )
+        val_loss = calc_loss_loader(
+            val_loader, model, device, eval_iter
+        )
+    model.train()
+    return train_loss, val_loss
+def generate_and_print_sample(model, tokenizer, device, start_context):
+    model.eval()
+    context_size = model.pos_emb.weight.shape[1]
+    encoded  = text_to_token_ids(start_context, tokenizer).to(device)
+    with torch.no_grad():
+        token_ids = generate_text_simple(
+            model = model,
+            idx = encoded,
+            max_new_tokens = 64,
+            context_size = context_size
+        )
+    decoded_text = token_ids_to_text(token_ids, tokenizer)
+    print(decoded_text.replace("\n", " "))
+    model.train()
     
-
-
-
-
-
-
+    
 
 if __name__=='__main__':
     if torch.cuda.is_available():
@@ -64,11 +116,13 @@ if __name__=='__main__':
         device = torch.device("mps")
     else:
         device = torch.device("cpu")
-        
+    print(f"Using device: {device}")
+    
     model = GPTModel(GPT_CONFIG_124M).to(device)
 
 
-    file_path = "../data/the-verdict.txt"
+    file_path = "data/the-verdict.txt"
+    
     # file_path = "../data/fuzuli.txt"
     with open(file_path, "r", encoding="utf-8") as file:
         text_data = file.read()
@@ -80,8 +134,8 @@ if __name__=='__main__':
     split_idx = int(train_ratio * len(text_data))
     train_data = text_data[:split_idx]
     val_data = text_data[split_idx:]
-
-
+    
+    
     torch.manual_seed(123)
 
     train_loader = create_dataloader_v1(
@@ -103,16 +157,16 @@ if __name__=='__main__':
         shuffle=False,
         num_workers=0
     )
+    tokenizer = tiktoken.get_encoding("gpt2")
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-2)
     
-    with torch.no_grad():
-        train_loss = calc_loss_loader(
-            train_loader, model, device
-        )
-        val_loss = calc_loss_loader(
-            
-        )
-    print(f"Train loss: {train_loss:.4f}")
-    print(f"Validation loss: {val_loss:.4f}")
+    num_epochs = 2
+    train_losses, val_losses = train_model(
+        model, train_loader, val_loader,
+        optimizer, device, num_epochs = num_epochs,
+        eval_freq = 5, eval_iter = 5,
+        start_context= " Every effort moves you", tokenizer=tokenizer,
+    )
     
 
 
